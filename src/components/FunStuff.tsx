@@ -75,7 +75,6 @@ function FunStuff() {
   const [apodPageUrl, setApodPageUrl] = useState<string>('https://apod.nasa.gov/apod/');
   const [apodModalOpen, setApodModalOpen] = useState(false);
 
-  const [chuckJoke, setChuckJoke] = useState<string>('Loading...');
   const [pokemonName, setPokemonName] = useState<string>('Loading...');
   const [pokemonImage, setPokemonImage] = useState<string>('');
   const [pokemonNumber, setPokemonNumber] = useState<number | null>(null);
@@ -92,13 +91,11 @@ function FunStuff() {
   const [cryptoStatus, setCryptoStatus] = useState<DataStatus>('loading');
   const [stockStatus, setStockStatus] = useState<DataStatus>('loading');
   const [apodStatus, setApodStatus] = useState<DataStatus>('loading');
-  const [jokeStatus, setJokeStatus] = useState<DataStatus>('loading');
   const [pokemonStatus, setPokemonStatus] = useState<DataStatus>('loading');
 
   const [cryptoUpdatedAt, setCryptoUpdatedAt] = useState<Date | null>(null);
   const [stockUpdatedAt, setStockUpdatedAt] = useState<Date | null>(null);
   const [apodUpdatedAt, setApodUpdatedAt] = useState<Date | null>(null);
-  const [jokeUpdatedAt, setJokeUpdatedAt] = useState<Date | null>(null);
   const [pokemonUpdatedAt, setPokemonUpdatedAt] = useState<Date | null>(null);
 
   const [cryptoRange, setCryptoRange] = useState<RangeOption>('7D');
@@ -502,29 +499,7 @@ function FunStuff() {
     }
   };
 
-  const fetchChuckJoke = async () => {
-    setJokeStatus('loading');
 
-    try {
-      const response = await fetch('https://api.chucknorris.io/jokes/random');
-      if (!response.ok) {
-        setChuckJoke('Unavailable');
-        setJokeStatus('error');
-        setJokeUpdatedAt(new Date());
-        return;
-      }
-
-      const data = await response.json();
-      const joke = typeof data?.value === 'string' ? data.value : 'No joke available today';
-      setChuckJoke(joke);
-      setJokeStatus('live');
-      setJokeUpdatedAt(new Date());
-    } catch {
-      setChuckJoke('Unavailable');
-      setJokeStatus('error');
-      setJokeUpdatedAt(new Date());
-    }
-  };
 
   const fetchDailyPokemon = async () => {
     setPokemonStatus('loading');
@@ -743,19 +718,16 @@ function FunStuff() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchApod();
-    fetchChuckJoke();
     fetchDailyPokemon();
     fetchCryptoPrices();
     fetchStockPrices();
 
     const apodInterval = setInterval(fetchApod, 60 * 60 * 1000);
-    const jokeInterval = setInterval(fetchChuckJoke, 10 * 60 * 1000);
     const cryptoInterval = setInterval(fetchCryptoPrices, 60 * 1000);
     const stockInterval = setInterval(fetchStockPrices, 2 * 60 * 1000);
 
     return () => {
       clearInterval(apodInterval);
-      clearInterval(jokeInterval);
       clearInterval(cryptoInterval);
       clearInterval(stockInterval);
     };
@@ -1027,23 +999,6 @@ function FunStuff() {
           </div>
         </div>
 
-        <div className="purple-divider"></div>
-
-        <div className="fun-widgets">
-          <div className="rapid-rating rapid-rating-fun fun-card" style={{ animationDelay: '360ms' }}>
-            <i className="fas fa-face-grin-squint rapid-rating-icon" aria-hidden="true"></i>
-            <p className="rapid-rating-title">Chuck Norris Joke</p>
-            <div className="card-tools">
-              <span className={`status-badge ${jokeStatus}`}>{statusLabel(jokeStatus)}</span>
-              <button type="button" className="refresh-btn" onClick={fetchChuckJoke} aria-label="Refresh joke">
-                <i className="fas fa-rotate-right" aria-hidden="true"></i>
-                Refresh
-              </button>
-            </div>
-            <p className="updated-time">{formatUpdatedTime(jokeUpdatedAt)}</p>
-            {jokeStatus === 'loading' ? <div className="skeleton-box joke"></div> : <p className="fun-joke-text">{chuckJoke}</p>}
-          </div>
-        </div>
       </div>
 
       {apodModalOpen && (

@@ -269,6 +269,9 @@ function Hero() {
     };
 
     fetchTodayFood();
+    // Update food menu every 2 hours
+    const foodInterval = setInterval(fetchTodayFood, 2 * 60 * 60 * 1000);
+    return () => clearInterval(foodInterval);
   }, []);
 
   const scrollToBottom = () => {
