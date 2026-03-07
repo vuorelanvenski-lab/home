@@ -1,0 +1,132 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Unica One', sans-serif;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.6;
+}
+
+/* Login styles */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #000000;
+}
+
+.login-form {
+  background: #000000;
+  padding: 2rem;
+  border-radius: 20px;
+  border: 2px solid #8411d1;
+  width: 300px;
+}
+
+.login-form h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: #8411d1;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+}
+
+.error {
+  color: red;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.login-form button {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #8411d1;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+.login-form button:hover {
+  background-color: #8d0da7;
+}
+
+/* Header styles */
+.header {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+/* ...existing code... */
+
+.logout-btn {
+  background: white;
+  border: 2px solid #8411d1;
+  color: black;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.logout-btn:hover {
+  background-color: #f0f0f0;
+}
+
+/* ...existing code... */
+
+
+/* Hero styles */
+.hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #000000; /* Added solid black background */
+  color: white;
+  font-size: 3rem;
+  margin: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.icon-links {
+  display: flex;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.icon-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  text-decoration: none;
+  font-size: 1rem;
+  transition: color 0.3s;
+}
+
+.icon-link:hover {
+  color: #4CAF50;
+}
+
+.icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
