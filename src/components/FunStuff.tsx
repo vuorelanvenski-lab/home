@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+/* eslint-disable react-hooks/exhaustive-deps */
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 type MarketQuote = {
   price: string;
@@ -6,37 +7,201 @@ type MarketQuote = {
   history: number[];
 };
 
+type DataStatus = 'loading' | 'live' | 'fallback' | 'rate-limited' | 'error';
+type RangeOption = '1D' | '7D' | '30D';
+
+const CRYPTO_SYMBOLS = [
+  'BTC',
+  'ETH',
+  'SOL',
+  'XRP',
+  'LTC',
+  'BNB',
+  'DOGE',
+  'ADA',
+  'TRX',
+  'AVAX',
+  'DOT',
+  'LINK',
+  'BCH',
+  'UNI',
+  'XLM',
+  'APT',
+  'NEAR',
+  'ICP',
+  'ETC',
+  'FIL',
+  'MATIC'
+] as const;
+const STOCK_ITEMS = [
+  { key: 'NVDA', label: '$ NVDA' },
+  { key: 'AMD', label: '$ AMD' },
+  { key: 'AMZN', label: '$ AMZN' },
+  { key: 'MSFT', label: '$ MSFT' },
+  { key: 'TSLA', label: '$ TSLA' },
+  { key: 'AAPL', label: '$ AAPL' },
+  { key: 'META', label: '$ META' },
+  { key: 'GOOGL', label: '$ GOOGL' },
+  { key: 'NFLX', label: '$ NFLX' },
+  { key: 'AVGO', label: '$ AVGO' },
+  { key: 'INTC', label: '$ INTC' },
+  { key: 'QCOM', label: '$ QCOM' },
+  { key: 'ORCL', label: '$ ORCL' },
+  { key: 'CSCO', label: '$ CSCO' },
+  { key: 'ADBE', label: '$ ADBE' },
+  { key: 'PYPL', label: '$ PYPL' },
+  { key: 'COIN', label: '$ COIN' },
+  { key: 'PLTR', label: '$ PLTR' },
+  { key: 'AMAT', label: '$ AMAT' },
+  { key: 'TXN', label: '$ TXN' },
+  { key: 'PANW', label: '$ PANW' },
+  { key: 'ASML', label: '$ ASML' },
+  { key: 'UBER', label: '$ UBER' },
+  { key: 'CRM', label: '$ CRM' },
+  { key: 'SHOP', label: '$ SHOP' }
+] as const;
+
+const makeEmptyQuote = (): MarketQuote => ({ price: 'Loading...', changePct: null, history: [] });
+const makeUnavailableQuote = (): MarketQuote => ({ price: 'Unavailable', changePct: null, history: [] });
+const buildQuoteRecord = (symbols: readonly string[], builder: () => MarketQuote): Record<string, MarketQuote> =>
+  Object.fromEntries(symbols.map((symbol) => [symbol, builder()])) as Record<string, MarketQuote>;
+
 function FunStuff() {
   const vantaRef = useRef<HTMLElement | null>(null);
   const vantaEffect = useRef<any>(null);
+
   const [apodTitle, setApodTitle] = useState<string>('Loading...');
   const [apodImageUrl, setApodImageUrl] = useState<string>('');
   const [apodPageUrl, setApodPageUrl] = useState<string>('https://apod.nasa.gov/apod/');
+  const [apodModalOpen, setApodModalOpen] = useState(false);
+
   const [chuckJoke, setChuckJoke] = useState<string>('Loading...');
   const [pokemonName, setPokemonName] = useState<string>('Loading...');
   const [pokemonImage, setPokemonImage] = useState<string>('');
   const [pokemonNumber, setPokemonNumber] = useState<number | null>(null);
-  const [cryptoPrices, setCryptoPrices] = useState<Record<string, MarketQuote>>({
-    BTC: { price: 'Loading...', changePct: null, history: [] },
-    ETH: { price: 'Loading...', changePct: null, history: [] },
-    SOL: { price: 'Loading...', changePct: null, history: [] },
-    XRP: { price: 'Loading...', changePct: null, history: [] },
-    LTC: { price: 'Loading...', changePct: null, history: [] }
+
+  const [cryptoPrices, setCryptoPrices] = useState<Record<string, MarketQuote>>(buildQuoteRecord(CRYPTO_SYMBOLS, makeEmptyQuote));
+
+  const [stockPrices, setStockPrices] = useState<Record<string, MarketQuote>>(
+    buildQuoteRecord(
+      STOCK_ITEMS.map((item) => item.key),
+      makeEmptyQuote
+    )
+  );
+
+  const [cryptoStatus, setCryptoStatus] = useState<DataStatus>('loading');
+  const [stockStatus, setStockStatus] = useState<DataStatus>('loading');
+  const [apodStatus, setApodStatus] = useState<DataStatus>('loading');
+  const [jokeStatus, setJokeStatus] = useState<DataStatus>('loading');
+  const [pokemonStatus, setPokemonStatus] = useState<DataStatus>('loading');
+
+  const [cryptoUpdatedAt, setCryptoUpdatedAt] = useState<Date | null>(null);
+  const [stockUpdatedAt, setStockUpdatedAt] = useState<Date | null>(null);
+  const [apodUpdatedAt, setApodUpdatedAt] = useState<Date | null>(null);
+  const [jokeUpdatedAt, setJokeUpdatedAt] = useState<Date | null>(null);
+  const [pokemonUpdatedAt, setPokemonUpdatedAt] = useState<Date | null>(null);
+
+  const [cryptoRange, setCryptoRange] = useState<RangeOption>('7D');
+  const [stockRange, setStockRange] = useState<RangeOption>('7D');
+
+  const [cryptoFilter, setCryptoFilter] = useState('');
+  const [stockFilter, setStockFilter] = useState('');
+
+  const [favoriteCrypto, setFavoriteCrypto] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('favoriteCrypto');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   });
-  const [stockPrices, setStockPrices] = useState<Record<string, MarketQuote>>({
-    NVDA: { price: 'Loading...', changePct: null, history: [] },
-    AMD: { price: 'Loading...', changePct: null, history: [] },
-    AMZN: { price: 'Loading...', changePct: null, history: [] },
-    MSFT: { price: 'Loading...', changePct: null, history: [] },
-    TSLA: { price: 'Loading...', changePct: null, history: [] }
+
+  const [favoriteStocks, setFavoriteStocks] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('favoriteStocks');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   });
+
+  const configuredApiKey = process.env.REACT_APP_NASA_API_KEY?.trim();
+  const nasaApiKey = configuredApiKey || 'DEMO_KEY';
+  const usingDemoKey = !configuredApiKey;
+  const apodHome = 'https://apod.nasa.gov/apod/';
 
   const cryptoLinks: Record<string, string> = {
     BTC: 'https://www.tradingview.com/symbols/BTCUSD/',
     ETH: 'https://www.tradingview.com/symbols/ETHUSD/',
     SOL: 'https://www.tradingview.com/symbols/SOLUSD/',
     XRP: 'https://www.tradingview.com/symbols/XRPUSD/',
-    LTC: 'https://www.tradingview.com/symbols/LTCUSD/'
+    LTC: 'https://www.tradingview.com/symbols/LTCUSD/',
+    BNB: 'https://www.tradingview.com/symbols/BNBUSD/',
+    DOGE: 'https://www.tradingview.com/symbols/DOGEUSD/',
+    ADA: 'https://www.tradingview.com/symbols/ADAUSD/',
+    TRX: 'https://www.tradingview.com/symbols/TRXUSD/',
+    AVAX: 'https://www.tradingview.com/symbols/AVAXUSD/',
+    DOT: 'https://www.tradingview.com/symbols/DOTUSD/',
+    LINK: 'https://www.tradingview.com/symbols/LINKUSD/',
+    BCH: 'https://www.tradingview.com/symbols/BCHUSD/',
+    UNI: 'https://www.tradingview.com/symbols/UNIUSD/',
+    XLM: 'https://www.tradingview.com/symbols/XLMUSD/',
+    APT: 'https://www.tradingview.com/symbols/APTUSD/',
+    NEAR: 'https://www.tradingview.com/symbols/NEARUSD/',
+    ICP: 'https://www.tradingview.com/symbols/ICPUSD/',
+    ETC: 'https://www.tradingview.com/symbols/ETCUSD/',
+    FIL: 'https://www.tradingview.com/symbols/FILUSD/',
+    MATIC: 'https://www.tradingview.com/symbols/MATICUSD/'
+  };
+
+  const cryptoIdBySymbol: Record<string, string> = {
+    BTC: 'bitcoin',
+    ETH: 'ethereum',
+    SOL: 'solana',
+    XRP: 'ripple',
+    LTC: 'litecoin',
+    BNB: 'binancecoin',
+    DOGE: 'dogecoin',
+    ADA: 'cardano',
+    TRX: 'tron',
+    AVAX: 'avalanche-2',
+    DOT: 'polkadot',
+    LINK: 'chainlink',
+    BCH: 'bitcoin-cash',
+    UNI: 'uniswap',
+    XLM: 'stellar',
+    APT: 'aptos',
+    NEAR: 'near',
+    ICP: 'internet-computer',
+    ETC: 'ethereum-classic',
+    FIL: 'filecoin',
+    MATIC: 'matic-network'
+  };
+
+  const cryptoIcons: Record<string, string> = {
+    BTC: 'https://cdn.simpleicons.org/bitcoin/F7931A',
+    ETH: 'https://cdn.simpleicons.org/ethereum/8C8C8C',
+    SOL: 'https://cdn.simpleicons.org/solana/14F195',
+    XRP: 'https://cdn.simpleicons.org/ripple/27A2DB',
+    LTC: 'https://cdn.simpleicons.org/litecoin/BEBEBE',
+    BNB: 'https://cdn.simpleicons.org/binance/F3BA2F',
+    DOGE: 'https://cdn.simpleicons.org/dogecoin/C2A633',
+    ADA: 'https://cdn.simpleicons.org/cardano/0033AD',
+    TRX: 'https://cdn.simpleicons.org/tron/FF060A',
+    AVAX: 'https://cdn.simpleicons.org/avalanche/FF6B6B',
+    DOT: 'https://cdn.simpleicons.org/polkadot/E6007A',
+    LINK: 'https://cdn.simpleicons.org/chainlink/2A5ADA',
+    BCH: 'https://cdn.simpleicons.org/bitcoincash/8DC351',
+    UNI: 'https://cdn.simpleicons.org/uniswap/FF007A',
+    XLM: 'https://cdn.simpleicons.org/stellar/7D00FF',
+    APT: 'https://cdn.simpleicons.org/aptos/FFFFFF',
+    NEAR: 'https://cdn.simpleicons.org/near/FFFFFF',
+    ICP: 'https://cdn.simpleicons.org/internetcomputer/29ABE2',
+    ETC: 'https://cdn.simpleicons.org/ethereumclassic/3AB83A',
+    FIL: 'https://cdn.simpleicons.org/filecoin/0090FF',
+    MATIC: 'https://cdn.simpleicons.org/polygon/8247E5'
   };
 
   const stockLinks: Record<string, string> = {
@@ -44,7 +209,65 @@ function FunStuff() {
     AMD: 'https://www.tradingview.com/symbols/NASDAQ-AMD/',
     AMZN: 'https://www.tradingview.com/symbols/NASDAQ-AMZN/',
     MSFT: 'https://www.tradingview.com/symbols/NASDAQ-MSFT/',
-    TSLA: 'https://www.tradingview.com/symbols/NASDAQ-TSLA/'
+    TSLA: 'https://www.tradingview.com/symbols/NASDAQ-TSLA/',
+    AAPL: 'https://www.tradingview.com/symbols/NASDAQ-AAPL/',
+    META: 'https://www.tradingview.com/symbols/NASDAQ-META/',
+    GOOGL: 'https://www.tradingview.com/symbols/NASDAQ-GOOGL/',
+    NFLX: 'https://www.tradingview.com/symbols/NASDAQ-NFLX/',
+    AVGO: 'https://www.tradingview.com/symbols/NASDAQ-AVGO/',
+    INTC: 'https://www.tradingview.com/symbols/NASDAQ-INTC/',
+    QCOM: 'https://www.tradingview.com/symbols/NASDAQ-QCOM/',
+    ORCL: 'https://www.tradingview.com/symbols/NYSE-ORCL/',
+    CSCO: 'https://www.tradingview.com/symbols/NASDAQ-CSCO/',
+    ADBE: 'https://www.tradingview.com/symbols/NASDAQ-ADBE/',
+    PYPL: 'https://www.tradingview.com/symbols/NASDAQ-PYPL/',
+    COIN: 'https://www.tradingview.com/symbols/NASDAQ-COIN/',
+    PLTR: 'https://www.tradingview.com/symbols/NASDAQ-PLTR/',
+    AMAT: 'https://www.tradingview.com/symbols/NASDAQ-AMAT/',
+    TXN: 'https://www.tradingview.com/symbols/NASDAQ-TXN/',
+    PANW: 'https://www.tradingview.com/symbols/NASDAQ-PANW/',
+    ASML: 'https://www.tradingview.com/symbols/NASDAQ-ASML/',
+    UBER: 'https://www.tradingview.com/symbols/NYSE-UBER/',
+    CRM: 'https://www.tradingview.com/symbols/NYSE-CRM/',
+    SHOP: 'https://www.tradingview.com/symbols/NYSE-SHOP/'
+  };
+
+  const usdFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 2
+      }),
+    []
+  );
+
+  const statusLabel = (status: DataStatus) => {
+    switch (status) {
+      case 'live':
+        return 'Live';
+      case 'fallback':
+        return 'Fallback';
+      case 'rate-limited':
+        return 'Rate limited';
+      case 'error':
+        return 'Error';
+      default:
+        return 'Loading';
+    }
+  };
+
+  const formatUpdatedTime = (value: Date | null) => {
+    if (!value) {
+      return 'Updated: --';
+    }
+
+    return `Updated: ${value.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    })}`;
   };
 
   const buildSparklinePoints = (history: number[]) => {
@@ -67,196 +290,245 @@ function FunStuff() {
       .join(' ');
   };
 
-  useEffect(() => {
-    const vanta = (window as any).VANTA;
-
-    if (vanta && vantaRef.current && !vantaEffect.current) {
-      vantaEffect.current = vanta.NET({
-        el: vantaRef.current,
-        mouseControls: true,
-        touchControls: true,
-        gyroControls: false,
-        minHeight: 200.0,
-        minWidth: 200.0,
-        scale: 1.0,
-        scaleMobile: 1.0,
-        color: 0x8411d1,
-        backgroundColor: 0x0,
-        points: 17.0,
-        maxDistance: 10.0,
-        spacing: 20.0
-      });
+  const sliceHistoryByRange = (history: number[], range: RangeOption, marketType: 'crypto' | 'stock') => {
+    if (!Array.isArray(history) || history.length < 2) {
+      return history;
     }
 
-    return () => {
-      if (vantaEffect.current) {
-        vantaEffect.current.destroy();
-        vantaEffect.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const configuredApiKey = process.env.REACT_APP_NASA_API_KEY?.trim();
-    const apiKey = configuredApiKey || 'DEMO_KEY';
-    const usingDemoKey = !configuredApiKey;
-    const apodHome = 'https://apod.nasa.gov/apod/';
-    const getApodPageUrl = (dateValue: unknown) => {
-      if (typeof dateValue !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-        return apodHome;
+    if (marketType === 'crypto') {
+      if (range === '1D') {
+        return history.slice(-24);
       }
 
-      const [year, month, day] = dateValue.split('-');
-      return `${apodHome}ap${year.slice(2)}${month}${day}.html`;
-    };
-
-    const resolveUrl = (rawUrl: string, base: string) => {
-      if (!rawUrl) {
-        return '';
+      if (range === '7D') {
+        return history.slice(-168);
       }
 
-      try {
-        return new URL(rawUrl, base).toString();
-      } catch {
-        return '';
+      return history.slice(-720);
+    }
+
+    if (range === '1D') {
+      return history.slice(-5);
+    }
+
+    if (range === '7D') {
+      return history.slice(-7);
+    }
+
+    return history.slice(-30);
+  };
+
+  const savePinned = (key: 'favoriteCrypto' | 'favoriteStocks', values: string[]) => {
+    localStorage.setItem(key, JSON.stringify(values));
+  };
+
+  const togglePinnedCrypto = (symbol: string) => {
+    setFavoriteCrypto((prev) => {
+      const next = prev.includes(symbol) ? prev.filter((item) => item !== symbol) : [...prev, symbol];
+      savePinned('favoriteCrypto', next);
+      return next;
+    });
+  };
+
+  const togglePinnedStock = (symbol: string) => {
+    setFavoriteStocks((prev) => {
+      const next = prev.includes(symbol) ? prev.filter((item) => item !== symbol) : [...prev, symbol];
+      savePinned('favoriteStocks', next);
+      return next;
+    });
+  };
+
+  const sortWithPinned = (symbols: string[], pinned: string[]) => {
+    return [...symbols].sort((a, b) => {
+      const aPinned = pinned.includes(a) ? 1 : 0;
+      const bPinned = pinned.includes(b) ? 1 : 0;
+
+      if (aPinned !== bPinned) {
+        return bPinned - aPinned;
       }
-    };
 
-    const fetchTextWithCorsFallback = async (url: string) => {
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+      return a.localeCompare(b);
+    });
+  };
 
-      try {
-        const direct = await fetch(url);
-        if (direct.ok) {
-          return await direct.text();
-        }
-      } catch {
-        // Fall through to proxy attempt.
+  const resolveUrl = (rawUrl: string, base: string) => {
+    if (!rawUrl) {
+      return '';
+    }
+
+    try {
+      return new URL(rawUrl, base).toString();
+    } catch {
+      return '';
+    }
+  };
+
+  const getApodPageUrl = (dateValue: unknown) => {
+    if (typeof dateValue !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+      return apodHome;
+    }
+
+    const [year, month, day] = dateValue.split('-');
+    return `${apodHome}ap${year.slice(2)}${month}${day}.html`;
+  };
+
+  const fetchTextWithCorsFallback = async (url: string) => {
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+
+    try {
+      const direct = await fetch(url);
+      if (direct.ok) {
+        return await direct.text();
       }
+    } catch {
+      // Fall through to proxy attempt.
+    }
 
-      const proxied = await fetch(proxyUrl);
-      if (!proxied.ok) {
-        throw new Error('Text fetch failed');
+    const proxied = await fetch(proxyUrl);
+    if (!proxied.ok) {
+      throw new Error('Text fetch failed');
+    }
+
+    return await proxied.text();
+  };
+
+  const fetchWithFallback = async (url: string) => {
+    try {
+      const direct = await fetch(url);
+      if (direct.ok) {
+        return direct;
       }
+    } catch {
+      // Fall through to proxy.
+    }
 
-      return await proxied.text();
-    };
+    return fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
+  };
+
+  const fetchApod = async () => {
+    setApodStatus('loading');
 
     const fetchRssWithFallback = async () => {
       const rssUrl = 'https://apod.nasa.gov/apod.rss';
-
-      const parseRss = async (xmlText: string) => {
-        const xmlDoc = new DOMParser().parseFromString(xmlText, 'text/xml');
-        const item = xmlDoc.querySelector('channel > item');
-        const title = item?.querySelector('title')?.textContent?.trim() || 'Astronomy Picture of the Day';
-        const linkRaw = item?.querySelector('link')?.textContent?.trim() || apodHome;
-        const link = resolveUrl(linkRaw, apodHome) || apodHome;
-        const desc = item?.querySelector('description')?.textContent || '';
-        const htmlDoc = new DOMParser().parseFromString(desc, 'text/html');
-        const rssImgRaw = htmlDoc.querySelector('img')?.getAttribute('src') || '';
-        let bestImage = resolveUrl(rssImgRaw, link || apodHome);
-
-        // RSS often points to a small preview image. Pull the image link from the APOD page when possible.
-        if (link && link !== apodHome) {
-          try {
-            const pageHtml = await fetchTextWithCorsFallback(link);
-            const pageDoc = new DOMParser().parseFromString(pageHtml, 'text/html');
-            const pageImageRaw =
-              pageDoc.querySelector('a[href^="image/"]')?.getAttribute('href') ||
-              pageDoc.querySelector('a[href*="/image/"]')?.getAttribute('href') ||
-              '';
-            const pageImage = resolveUrl(pageImageRaw, link);
-
-            if (pageImage) {
-              bestImage = pageImage;
-            }
-          } catch {
-            // Keep RSS image fallback.
-          }
-        }
-
-        setApodTitle(title);
-        setApodPageUrl(link);
-        setApodImageUrl(bestImage);
-      };
-
       const xmlText = await fetchTextWithCorsFallback(rssUrl);
-      await parseRss(xmlText);
-    };
+      const xmlDoc = new DOMParser().parseFromString(xmlText, 'text/xml');
+      const item = xmlDoc.querySelector('channel > item');
+      const title = item?.querySelector('title')?.textContent?.trim() || 'Astronomy Picture of the Day';
+      const linkRaw = item?.querySelector('link')?.textContent?.trim() || apodHome;
+      const link = resolveUrl(linkRaw, apodHome) || apodHome;
+      const desc = item?.querySelector('description')?.textContent || '';
+      const htmlDoc = new DOMParser().parseFromString(desc, 'text/html');
+      const rssImgRaw = htmlDoc.querySelector('img')?.getAttribute('src') || '';
+      let bestImage = resolveUrl(rssImgRaw, link || apodHome);
 
-    const fetchApod = async () => {
-      try {
-        const response = await fetch(`https://api.nasa.gov/planetary/apod?api_key=${apiKey}&thumbs=true`);
-
-        if (!response.ok) {
-          if (!usingDemoKey && (response.status === 400 || response.status === 403)) {
-            setApodTitle('Invalid NASA API key - update REACT_APP_NASA_API_KEY');
-            setApodImageUrl('');
-            setApodPageUrl('https://api.nasa.gov/');
-            return;
-          }
-
-          if (usingDemoKey && response.status === 429) {
-            setApodTitle('NASA API limit hit - set REACT_APP_NASA_API_KEY');
-            setApodImageUrl('');
-            setApodPageUrl('https://api.nasa.gov/');
-            return;
-          }
-
-          await fetchRssWithFallback();
-          return;
-        }
-
-        const data = await response.json();
-        const title = typeof data?.title === 'string' ? data.title : 'Astronomy Picture of the Day';
-        const mediaType = data?.media_type;
-        const imageUrl = typeof data?.hdurl === 'string' ? data.hdurl : data?.url;
-        const pageUrl = getApodPageUrl(data?.date);
-
-        setApodPageUrl(pageUrl);
-
-        if (mediaType === 'image' && typeof imageUrl === 'string') {
-          setApodTitle(title);
-          setApodImageUrl(imageUrl);
-        } else {
-          setApodTitle(`${title} (video today)`);
-          setApodImageUrl('');
-        }
-      } catch {
+      if (link && link !== apodHome) {
         try {
-          await fetchRssWithFallback();
+          const pageHtml = await fetchTextWithCorsFallback(link);
+          const pageDoc = new DOMParser().parseFromString(pageHtml, 'text/html');
+          const pageImageRaw =
+            pageDoc.querySelector('a[href^="image/"]')?.getAttribute('href') ||
+            pageDoc.querySelector('a[href*="/image/"]')?.getAttribute('href') ||
+            '';
+          const pageImage = resolveUrl(pageImageRaw, link);
+          if (pageImage) {
+            bestImage = pageImage;
+          }
         } catch {
-          setApodTitle('Unavailable');
-          setApodImageUrl('');
-          setApodPageUrl(apodHome);
+          // Keep RSS image fallback.
         }
       }
+
+      setApodTitle(title);
+      setApodPageUrl(link);
+      setApodImageUrl(bestImage);
+      setApodStatus('fallback');
+      setApodUpdatedAt(new Date());
     };
 
-    fetchApod();
-  }, []);
+    try {
+      const response = await fetch(`https://api.nasa.gov/planetary/apod?api_key=${nasaApiKey}&thumbs=true`);
 
-  useEffect(() => {
-    const fetchChuckJoke = async () => {
-      try {
-        const response = await fetch('https://api.chucknorris.io/jokes/random');
-        if (!response.ok) {
-          setChuckJoke('Unavailable');
+      if (!response.ok) {
+        if (!usingDemoKey && (response.status === 400 || response.status === 403)) {
+          setApodTitle('Invalid NASA API key - update REACT_APP_NASA_API_KEY');
+          setApodImageUrl('');
+          setApodPageUrl('https://api.nasa.gov/');
+          setApodStatus('error');
+          setApodUpdatedAt(new Date());
           return;
         }
 
-        const data = await response.json();
-        const joke = typeof data?.value === 'string' ? data.value : 'No joke available today';
-        setChuckJoke(joke);
-      } catch {
-        setChuckJoke('Unavailable');
+        if (usingDemoKey && response.status === 429) {
+          setApodTitle('NASA API limit hit - set REACT_APP_NASA_API_KEY');
+          setApodImageUrl('');
+          setApodPageUrl('https://api.nasa.gov/');
+          setApodStatus('rate-limited');
+          setApodUpdatedAt(new Date());
+          return;
+        }
+
+        await fetchRssWithFallback();
+        return;
       }
-    };
 
-    fetchChuckJoke();
-  }, []);
+      const data = await response.json();
+      const title = typeof data?.title === 'string' ? data.title : 'Astronomy Picture of the Day';
+      const mediaType = data?.media_type;
+      const imageUrl = typeof data?.hdurl === 'string' ? data.hdurl : data?.url;
+      const pageUrl = getApodPageUrl(data?.date);
 
-  useEffect(() => {
+      setApodPageUrl(pageUrl);
+
+      if (mediaType === 'image' && typeof imageUrl === 'string') {
+        setApodTitle(title);
+        setApodImageUrl(imageUrl);
+      } else {
+        setApodTitle(`${title} (video today)`);
+        setApodImageUrl('');
+      }
+
+      setApodStatus('live');
+      setApodUpdatedAt(new Date());
+    } catch {
+      try {
+        await fetchRssWithFallback();
+      } catch {
+        setApodTitle('Unavailable');
+        setApodImageUrl('');
+        setApodPageUrl(apodHome);
+        setApodStatus('error');
+        setApodUpdatedAt(new Date());
+      }
+    }
+  };
+
+  const fetchChuckJoke = async () => {
+    setJokeStatus('loading');
+
+    try {
+      const response = await fetch('https://api.chucknorris.io/jokes/random');
+      if (!response.ok) {
+        setChuckJoke('Unavailable');
+        setJokeStatus('error');
+        setJokeUpdatedAt(new Date());
+        return;
+      }
+
+      const data = await response.json();
+      const joke = typeof data?.value === 'string' ? data.value : 'No joke available today';
+      setChuckJoke(joke);
+      setJokeStatus('live');
+      setJokeUpdatedAt(new Date());
+    } catch {
+      setChuckJoke('Unavailable');
+      setJokeStatus('error');
+      setJokeUpdatedAt(new Date());
+    }
+  };
+
+  const fetchDailyPokemon = async () => {
+    setPokemonStatus('loading');
+
     const getDayOfYear = () => {
       const now = new Date();
       const start = new Date(now.getFullYear(), 0, 0);
@@ -264,134 +536,90 @@ function FunStuff() {
       return Math.floor(diff / 86400000);
     };
 
-    const fetchDailyPokemon = async () => {
-      try {
-        const maxPokemonId = 1025;
-        const day = getDayOfYear();
-        const pokemonId = (day % maxPokemonId) + 1;
+    try {
+      const maxPokemonId = 1025;
+      const day = getDayOfYear();
+      const pokemonId = (day % maxPokemonId) + 1;
 
-        const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
-        if (!response.ok) {
-          setPokemonName('Unavailable');
-          setPokemonImage('');
-          setPokemonNumber(null);
-          return;
-        }
-
-        const data = await response.json();
-        const name = typeof data?.name === 'string' ? data.name : 'Unknown';
-        const artwork = data?.sprites?.other?.['official-artwork']?.front_default;
-        const sprite = data?.sprites?.front_default;
-
-        setPokemonName(name.charAt(0).toUpperCase() + name.slice(1));
-        setPokemonImage(artwork || sprite || '');
-        setPokemonNumber(typeof data?.id === 'number' ? data.id : pokemonId);
-      } catch {
+      const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
+      if (!response.ok) {
         setPokemonName('Unavailable');
         setPokemonImage('');
         setPokemonNumber(null);
-      }
-    };
-
-    fetchDailyPokemon();
-  }, []);
-
-  useEffect(() => {
-    const usdFormatter = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 2
-    });
-
-    const fetchCryptoPrices = async () => {
-      try {
-        const response = await fetch(
-          'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,ripple,litecoin&price_change_percentage=24h&sparkline=true'
-        );
-
-        if (!response.ok) {
-          setCryptoPrices({
-            BTC: { price: 'Unavailable', changePct: null, history: [] },
-            ETH: { price: 'Unavailable', changePct: null, history: [] },
-            SOL: { price: 'Unavailable', changePct: null, history: [] },
-            XRP: { price: 'Unavailable', changePct: null, history: [] },
-            LTC: { price: 'Unavailable', changePct: null, history: [] }
-          });
-          return;
-        }
-
-        const data = await response.json();
-        const byId = Array.isArray(data)
-          ? Object.fromEntries(data.map((item: any) => [item.id, item]))
-          : {};
-
-        setCryptoPrices({
-          BTC: {
-            price: typeof byId?.bitcoin?.current_price === 'number' ? usdFormatter.format(byId.bitcoin.current_price) : 'N/A',
-            changePct: typeof byId?.bitcoin?.price_change_percentage_24h === 'number' ? byId.bitcoin.price_change_percentage_24h : null,
-            history: Array.isArray(byId?.bitcoin?.sparkline_in_7d?.price)
-              ? byId.bitcoin.sparkline_in_7d.price.filter((v: any) => typeof v === 'number').slice(-24)
-              : []
-          },
-          ETH: {
-            price: typeof byId?.ethereum?.current_price === 'number' ? usdFormatter.format(byId.ethereum.current_price) : 'N/A',
-            changePct: typeof byId?.ethereum?.price_change_percentage_24h === 'number' ? byId.ethereum.price_change_percentage_24h : null,
-            history: Array.isArray(byId?.ethereum?.sparkline_in_7d?.price)
-              ? byId.ethereum.sparkline_in_7d.price.filter((v: any) => typeof v === 'number').slice(-24)
-              : []
-          },
-          SOL: {
-            price: typeof byId?.solana?.current_price === 'number' ? usdFormatter.format(byId.solana.current_price) : 'N/A',
-            changePct: typeof byId?.solana?.price_change_percentage_24h === 'number' ? byId.solana.price_change_percentage_24h : null,
-            history: Array.isArray(byId?.solana?.sparkline_in_7d?.price)
-              ? byId.solana.sparkline_in_7d.price.filter((v: any) => typeof v === 'number').slice(-24)
-              : []
-          },
-          XRP: {
-            price: typeof byId?.ripple?.current_price === 'number' ? usdFormatter.format(byId.ripple.current_price) : 'N/A',
-            changePct: typeof byId?.ripple?.price_change_percentage_24h === 'number' ? byId.ripple.price_change_percentage_24h : null,
-            history: Array.isArray(byId?.ripple?.sparkline_in_7d?.price)
-              ? byId.ripple.sparkline_in_7d.price.filter((v: any) => typeof v === 'number').slice(-24)
-              : []
-          },
-          LTC: {
-            price: typeof byId?.litecoin?.current_price === 'number' ? usdFormatter.format(byId.litecoin.current_price) : 'N/A',
-            changePct: typeof byId?.litecoin?.price_change_percentage_24h === 'number' ? byId.litecoin.price_change_percentage_24h : null,
-            history: Array.isArray(byId?.litecoin?.sparkline_in_7d?.price)
-              ? byId.litecoin.sparkline_in_7d.price.filter((v: any) => typeof v === 'number').slice(-24)
-              : []
-          }
-        });
-      } catch {
-        setCryptoPrices({
-          BTC: { price: 'Unavailable', changePct: null, history: [] },
-          ETH: { price: 'Unavailable', changePct: null, history: [] },
-          SOL: { price: 'Unavailable', changePct: null, history: [] },
-          XRP: { price: 'Unavailable', changePct: null, history: [] },
-          LTC: { price: 'Unavailable', changePct: null, history: [] }
-        });
-      }
-    };
-
-    fetchCryptoPrices();
-    const interval = setInterval(fetchCryptoPrices, 60000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const fetchWithFallback = async (url: string) => {
-      try {
-        const direct = await fetch(url);
-        if (direct.ok) {
-          return direct;
-        }
-      } catch {
-        // Fall through to proxy.
+        setPokemonStatus('error');
+        setPokemonUpdatedAt(new Date());
+        return;
       }
 
-      return fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-    };
+      const data = await response.json();
+      const name = typeof data?.name === 'string' ? data.name : 'Unknown';
+      const artwork = data?.sprites?.other?.['official-artwork']?.front_default;
+      const sprite = data?.sprites?.front_default;
+
+      setPokemonName(name.charAt(0).toUpperCase() + name.slice(1));
+      setPokemonImage(artwork || sprite || '');
+      setPokemonNumber(typeof data?.id === 'number' ? data.id : pokemonId);
+      setPokemonStatus('live');
+      setPokemonUpdatedAt(new Date());
+    } catch {
+      setPokemonName('Unavailable');
+      setPokemonImage('');
+      setPokemonNumber(null);
+      setPokemonStatus('error');
+      setPokemonUpdatedAt(new Date());
+    }
+  };
+
+  const fetchCryptoPrices = async () => {
+    setCryptoStatus('loading');
+
+    try {
+      const cryptoIds = CRYPTO_SYMBOLS.map((symbol) => cryptoIdBySymbol[symbol]).join(',');
+      const response = await fetch(
+        `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${cryptoIds}&price_change_percentage=24h&sparkline=true`
+      );
+
+      if (!response.ok) {
+        setCryptoPrices(buildQuoteRecord(CRYPTO_SYMBOLS, makeUnavailableQuote));
+        setCryptoStatus('error');
+        setCryptoUpdatedAt(new Date());
+        return;
+      }
+
+      const data = await response.json();
+      const byId = Array.isArray(data) ? Object.fromEntries(data.map((item: any) => [item.id, item])) : {};
+
+      setCryptoPrices(
+        Object.fromEntries(
+          CRYPTO_SYMBOLS.map((symbol) => {
+            const coinId = cryptoIdBySymbol[symbol];
+            const coin = byId?.[coinId];
+
+            return [
+              symbol,
+              {
+                price: typeof coin?.current_price === 'number' ? usdFormatter.format(coin.current_price) : 'N/A',
+                changePct: typeof coin?.price_change_percentage_24h === 'number' ? coin.price_change_percentage_24h : null,
+                history: Array.isArray(coin?.sparkline_in_7d?.price)
+                  ? coin.sparkline_in_7d.price.filter((v: any) => typeof v === 'number')
+                  : []
+              } as MarketQuote
+            ];
+          })
+        ) as Record<string, MarketQuote>
+      );
+
+      setCryptoStatus('live');
+      setCryptoUpdatedAt(new Date());
+    } catch {
+      setCryptoPrices(buildQuoteRecord(CRYPTO_SYMBOLS, makeUnavailableQuote));
+      setCryptoStatus('error');
+      setCryptoUpdatedAt(new Date());
+    }
+  };
+
+  const fetchStockPrices = async () => {
+    setStockStatus('loading');
 
     const parsePriceFromCsv = (csvText: string) => {
       const lines = csvText.trim().split(/\r?\n/);
@@ -410,11 +638,7 @@ function FunStuff() {
       }
 
       const changePct = Number.isFinite(open) && open !== 0 ? ((price - open) / open) * 100 : null;
-      const formattedPrice = new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        maximumFractionDigits: 2
-      }).format(price);
+      const formattedPrice = usdFormatter.format(price);
 
       return { price: formattedPrice, changePct, history: [] as number[] };
     };
@@ -429,11 +653,11 @@ function FunStuff() {
       return rows
         .map((row) => Number(row[4]))
         .filter((value) => Number.isFinite(value))
-        .slice(-20);
+        .slice(-40);
     };
 
-    const fetchStockPrices = async () => {
-      const symbols = ['NVDA.US', 'AMD.US', 'AMZN.US', 'MSFT.US', 'TSLA.US'];
+    try {
+      const symbols = STOCK_ITEMS.map((stock) => `${stock.key}.US`);
 
       const results = await Promise.all(
         symbols.map(async (symbol) => {
@@ -467,13 +691,93 @@ function FunStuff() {
       );
 
       setStockPrices(Object.fromEntries(results));
+      setStockStatus('live');
+      setStockUpdatedAt(new Date());
+    } catch {
+      setStockPrices(buildQuoteRecord(STOCK_ITEMS.map((stock) => stock.key), makeUnavailableQuote));
+      setStockStatus('error');
+      setStockUpdatedAt(new Date());
+    }
+  };
+
+  useEffect(() => {
+    const vanta = (window as any).VANTA;
+
+    if (vanta && vantaRef.current && !vantaEffect.current) {
+      vantaEffect.current = vanta.NET({
+        el: vantaRef.current,
+        mouseControls: true,
+        touchControls: true,
+        gyroControls: false,
+        minHeight: 200.0,
+        minWidth: 200.0,
+        scale: 1.0,
+        scaleMobile: 1.0,
+        color: 0x8411d1,
+        backgroundColor: 0x0,
+        points: 17.0,
+        maxDistance: 10.0,
+        spacing: 20.0
+      });
+    }
+
+    return () => {
+      if (vantaEffect.current) {
+        vantaEffect.current.destroy();
+        vantaEffect.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setApodModalOpen(false);
+      }
     };
 
-    fetchStockPrices();
-    const interval = setInterval(fetchStockPrices, 120000);
-
-    return () => clearInterval(interval);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
   }, []);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    fetchApod();
+    fetchChuckJoke();
+    fetchDailyPokemon();
+    fetchCryptoPrices();
+    fetchStockPrices();
+
+    const apodInterval = setInterval(fetchApod, 60 * 60 * 1000);
+    const jokeInterval = setInterval(fetchChuckJoke, 10 * 60 * 1000);
+    const cryptoInterval = setInterval(fetchCryptoPrices, 60 * 1000);
+    const stockInterval = setInterval(fetchStockPrices, 2 * 60 * 1000);
+
+    return () => {
+      clearInterval(apodInterval);
+      clearInterval(jokeInterval);
+      clearInterval(cryptoInterval);
+      clearInterval(stockInterval);
+    };
+  }, []);
+
+  const visibleCrypto = useMemo(() => {
+    const filter = cryptoFilter.trim().toUpperCase();
+    const filtered = CRYPTO_SYMBOLS.filter((symbol) => !filter || symbol.includes(filter));
+    return sortWithPinned([...filtered], favoriteCrypto);
+  }, [cryptoFilter, favoriteCrypto]);
+
+  const visibleStocks = useMemo(() => {
+    const filter = stockFilter.trim().toUpperCase();
+    const filtered = STOCK_ITEMS.filter((stock) => !filter || stock.key.includes(filter));
+    const orderedKeys = sortWithPinned(
+      filtered.map((stock) => stock.key),
+      favoriteStocks
+    );
+    return orderedKeys
+      .map((key) => STOCK_ITEMS.find((item) => item.key === key))
+      .filter((item): item is (typeof STOCK_ITEMS)[number] => Boolean(item));
+  }, [stockFilter, favoriteStocks]);
 
   return (
     <section className="fun-page" aria-live="polite" ref={vantaRef}>
@@ -482,18 +786,60 @@ function FunStuff() {
         <div className="purple-divider"></div>
 
         <div className="market-row">
-          <div className="rapid-rating rapid-rating-fun market-card">
-            <i className="fas fa-coins rapid-rating-icon" aria-hidden="true"></i>
+          <div className="rapid-rating rapid-rating-fun market-card fun-card" style={{ animationDelay: '0ms' }}>
+            <i className="fa-brands fa-btc rapid-rating-icon" aria-hidden="true"></i>
             <p className="rapid-rating-title">Crypto Prices</p>
+            <div className="card-tools">
+              <span className={`status-badge ${cryptoStatus}`}>{statusLabel(cryptoStatus)}</span>
+              <button type="button" className="refresh-btn" onClick={fetchCryptoPrices} aria-label="Refresh crypto prices">
+                <i className="fas fa-rotate-right" aria-hidden="true"></i>
+                Refresh
+              </button>
+            </div>
+            <p className="updated-time">{formatUpdatedTime(cryptoUpdatedAt)}</p>
+            <div className="market-controls">
+              <input
+                type="text"
+                value={cryptoFilter}
+                onChange={(event) => setCryptoFilter(event.target.value)}
+                className="market-search"
+                placeholder="Filter symbols"
+                aria-label="Filter cryptocurrencies"
+              />
+              <div className="range-toggle" role="group" aria-label="Crypto chart range">
+                {(['1D', '7D', '30D'] as RangeOption[]).map((range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    className={`range-btn ${cryptoRange === range ? 'active' : ''}`}
+                    onClick={() => setCryptoRange(range)}
+                  >
+                    {range}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="market-list">
-              {['BTC', 'ETH', 'SOL', 'XRP', 'LTC'].map((symbol) => {
+              {visibleCrypto.map((symbol) => {
                 const quote = cryptoPrices[symbol];
                 const change = quote?.changePct;
                 const directionClass = typeof change === 'number' ? (change >= 0 ? 'up' : 'down') : 'neutral';
-                const points = buildSparklinePoints(quote?.history || []);
+                const filteredHistory = sliceHistoryByRange(quote?.history || [], cryptoRange, 'crypto');
+                const points = buildSparklinePoints(filteredHistory);
+                const iconSrc = cryptoIcons[symbol];
+                const isPinned = favoriteCrypto.includes(symbol);
+                const isLoading = quote?.price === 'Loading...';
 
                 return (
                   <div key={symbol} className="market-item">
+                    <button
+                      type="button"
+                      className={`pin-btn ${isPinned ? 'active' : ''}`}
+                      onClick={() => togglePinnedCrypto(symbol)}
+                      aria-label={`${isPinned ? 'Unpin' : 'Pin'} ${symbol}`}
+                    >
+                      <i className={`fas ${isPinned ? 'fa-star' : 'fa-star-half-stroke'}`} aria-hidden="true"></i>
+                    </button>
                     <a
                       href={cryptoLinks[symbol]}
                       target="_blank"
@@ -502,7 +848,10 @@ function FunStuff() {
                       aria-label={`${symbol} chart`}
                     >
                       <div className="market-inline-row">
-                        <span className="market-label">{symbol}</span>
+                        <span className="market-label">
+                          <img src={iconSrc} alt="" aria-hidden="true" className="market-crypto-icon" loading="lazy" />
+                          {symbol}
+                        </span>
                         <div className="market-sparkline">
                           {points ? (
                             <svg viewBox="0 0 120 32" className="sparkline-svg" aria-hidden="true">
@@ -512,10 +861,18 @@ function FunStuff() {
                             <span className="sparkline-empty"></span>
                           )}
                         </div>
-                        <span className={`market-price ${directionClass}`}>{quote?.price || 'N/A'}</span>
-                        <span className={`market-change ${directionClass}`}>
-                          {typeof change === 'number' ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}%` : 'N/A'}
-                        </span>
+                        {isLoading ? (
+                          <span className="skeleton-line price"></span>
+                        ) : (
+                          <span className={`market-price ${directionClass}`}>{quote?.price || 'N/A'}</span>
+                        )}
+                        {isLoading ? (
+                          <span className="skeleton-line change"></span>
+                        ) : (
+                          <span className={`market-change ${directionClass}`}>
+                            {typeof change === 'number' ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}%` : 'N/A'}
+                          </span>
+                        )}
                       </div>
                     </a>
                   </div>
@@ -524,24 +881,59 @@ function FunStuff() {
             </div>
           </div>
 
-          <div className="rapid-rating rapid-rating-fun market-card">
+          <div className="rapid-rating rapid-rating-fun market-card fun-card" style={{ animationDelay: '90ms' }}>
             <i className="fas fa-chart-line rapid-rating-icon" aria-hidden="true"></i>
             <p className="rapid-rating-title">Stocks</p>
+            <div className="card-tools">
+              <span className={`status-badge ${stockStatus}`}>{statusLabel(stockStatus)}</span>
+              <button type="button" className="refresh-btn" onClick={fetchStockPrices} aria-label="Refresh stock prices">
+                <i className="fas fa-rotate-right" aria-hidden="true"></i>
+                Refresh
+              </button>
+            </div>
+            <p className="updated-time">{formatUpdatedTime(stockUpdatedAt)}</p>
+            <div className="market-controls">
+              <input
+                type="text"
+                value={stockFilter}
+                onChange={(event) => setStockFilter(event.target.value)}
+                className="market-search"
+                placeholder="Filter symbols"
+                aria-label="Filter stock symbols"
+              />
+              <div className="range-toggle" role="group" aria-label="Stock chart range">
+                {(['1D', '7D', '30D'] as RangeOption[]).map((range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    className={`range-btn ${stockRange === range ? 'active' : ''}`}
+                    onClick={() => setStockRange(range)}
+                  >
+                    {range}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="market-list">
-              {[
-                { label: 'NVIDIA (NVDA)', key: 'NVDA' },
-                { label: 'AMD', key: 'AMD' },
-                { label: 'Amazon (AMZN)', key: 'AMZN' },
-                { label: 'Microsoft (MSFT)', key: 'MSFT' },
-                { label: 'Tesla (TSLA)', key: 'TSLA' }
-              ].map((stock) => {
+              {visibleStocks.map((stock) => {
                 const quote = stockPrices[stock.key];
                 const change = quote?.changePct;
                 const directionClass = typeof change === 'number' ? (change >= 0 ? 'up' : 'down') : 'neutral';
-                const points = buildSparklinePoints(quote?.history || []);
+                const filteredHistory = sliceHistoryByRange(quote?.history || [], stockRange, 'stock');
+                const points = buildSparklinePoints(filteredHistory);
+                const isPinned = favoriteStocks.includes(stock.key);
+                const isLoading = quote?.price === 'Loading...';
 
                 return (
                   <div key={stock.key} className="market-item">
+                    <button
+                      type="button"
+                      className={`pin-btn ${isPinned ? 'active' : ''}`}
+                      onClick={() => togglePinnedStock(stock.key)}
+                      aria-label={`${isPinned ? 'Unpin' : 'Pin'} ${stock.key}`}
+                    >
+                      <i className={`fas ${isPinned ? 'fa-star' : 'fa-star-half-stroke'}`} aria-hidden="true"></i>
+                    </button>
                     <a
                       href={stockLinks[stock.key]}
                       target="_blank"
@@ -560,10 +952,18 @@ function FunStuff() {
                             <span className="sparkline-empty"></span>
                           )}
                         </div>
-                        <span className={`market-price ${directionClass}`}>{quote?.price || 'N/A'}</span>
-                        <span className={`market-change ${directionClass}`}>
-                          {typeof change === 'number' ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}%` : 'N/A'}
-                        </span>
+                        {isLoading ? (
+                          <span className="skeleton-line price"></span>
+                        ) : (
+                          <span className={`market-price ${directionClass}`}>{quote?.price || 'N/A'}</span>
+                        )}
+                        {isLoading ? (
+                          <span className="skeleton-line change"></span>
+                        ) : (
+                          <span className={`market-change ${directionClass}`}>
+                            {typeof change === 'number' ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}%` : 'N/A'}
+                          </span>
+                        )}
                       </div>
                     </a>
                   </div>
@@ -572,10 +972,20 @@ function FunStuff() {
             </div>
           </div>
 
-          <div className="rapid-rating rapid-rating-fun">
+          <div className="rapid-rating rapid-rating-fun fun-card" style={{ animationDelay: '180ms' }}>
             <i className="fas fa-dragon rapid-rating-icon" aria-hidden="true"></i>
             <p className="rapid-rating-title">Daily Pokemon</p>
-            {pokemonImage ? (
+            <div className="card-tools">
+              <span className={`status-badge ${pokemonStatus}`}>{statusLabel(pokemonStatus)}</span>
+              <button type="button" className="refresh-btn" onClick={fetchDailyPokemon} aria-label="Refresh daily pokemon">
+                <i className="fas fa-rotate-right" aria-hidden="true"></i>
+                Refresh
+              </button>
+            </div>
+            <p className="updated-time">{formatUpdatedTime(pokemonUpdatedAt)}</p>
+            {pokemonStatus === 'loading' ? (
+              <div className="skeleton-box pokemon"></div>
+            ) : pokemonImage ? (
               <img src={pokemonImage} alt={pokemonName} className="pokemon-image" loading="lazy" />
             ) : (
               <p className="fun-joke-text">No image available</p>
@@ -586,16 +996,28 @@ function FunStuff() {
             </p>
           </div>
 
-          <div className="rapid-rating rapid-rating-apod rapid-rating-fun">
+          <div className="rapid-rating rapid-rating-apod rapid-rating-fun fun-card" style={{ animationDelay: '270ms' }}>
             <i className="fas fa-star rapid-rating-icon" aria-hidden="true"></i>
             <p className="rapid-rating-title">Astronomy Picture</p>
-            {apodImageUrl ? (
-              <a href={apodPageUrl} target="_blank" rel="noopener noreferrer" className="apod-link">
+            <div className="card-tools">
+              <span className={`status-badge ${apodStatus}`}>{statusLabel(apodStatus)}</span>
+              <button type="button" className="refresh-btn" onClick={fetchApod} aria-label="Refresh astronomy picture">
+                <i className="fas fa-rotate-right" aria-hidden="true"></i>
+                Refresh
+              </button>
+            </div>
+            <p className="updated-time">{formatUpdatedTime(apodUpdatedAt)}</p>
+            {apodStatus === 'loading' ? (
+              <div className="skeleton-box apod"></div>
+            ) : apodImageUrl ? (
+              <button
+                type="button"
+                className="apod-image-btn"
+                onClick={() => setApodModalOpen(true)}
+                aria-label="Open astronomy image preview"
+              >
                 <img src={apodImageUrl} alt={apodTitle} className="apod-image" loading="lazy" />
-                <span className="apod-full-preview" aria-hidden="true">
-                  <img src={apodImageUrl} alt="" className="apod-full-image" loading="lazy" />
-                </span>
-              </a>
+              </button>
             ) : (
               <a href={apodPageUrl} target="_blank" rel="noopener noreferrer" className="rapid-rating-value">
                 Open APOD
@@ -608,13 +1030,41 @@ function FunStuff() {
         <div className="purple-divider"></div>
 
         <div className="fun-widgets">
-          <div className="rapid-rating rapid-rating-fun">
+          <div className="rapid-rating rapid-rating-fun fun-card" style={{ animationDelay: '360ms' }}>
             <i className="fas fa-face-grin-squint rapid-rating-icon" aria-hidden="true"></i>
             <p className="rapid-rating-title">Chuck Norris Joke</p>
-            <p className="fun-joke-text">{chuckJoke}</p>
+            <div className="card-tools">
+              <span className={`status-badge ${jokeStatus}`}>{statusLabel(jokeStatus)}</span>
+              <button type="button" className="refresh-btn" onClick={fetchChuckJoke} aria-label="Refresh joke">
+                <i className="fas fa-rotate-right" aria-hidden="true"></i>
+                Refresh
+              </button>
+            </div>
+            <p className="updated-time">{formatUpdatedTime(jokeUpdatedAt)}</p>
+            {jokeStatus === 'loading' ? <div className="skeleton-box joke"></div> : <p className="fun-joke-text">{chuckJoke}</p>}
           </div>
         </div>
       </div>
+
+      {apodModalOpen && (
+        <div className="apod-modal" role="dialog" aria-modal="true" aria-label="Astronomy image preview" onClick={() => setApodModalOpen(false)}>
+          <button
+            type="button"
+            className="apod-modal-close"
+            onClick={() => setApodModalOpen(false)}
+            aria-label="Close astronomy preview"
+          >
+            <i className="fas fa-xmark" aria-hidden="true"></i>
+          </button>
+          <img
+            src={apodImageUrl}
+            alt={apodTitle}
+            className="apod-full-image"
+            loading="lazy"
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
     </section>
   );
 }
