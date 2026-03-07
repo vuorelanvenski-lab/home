@@ -15,9 +15,6 @@ function Hero() {
   const [weather, setWeather] = useState<string>('Loading...');
   const [countdown, setCountdown] = useState<string>('Loading...');
   const [todayFood, setTodayFood] = useState<string>('Loading...');
-  const [apodTitle, setApodTitle] = useState<string>('Loading...');
-  const [apodImageUrl, setApodImageUrl] = useState<string>('');
-  const [apodPageUrl, setApodPageUrl] = useState<string>('https://apod.nasa.gov/apod/');
 
   useEffect(() => {
     if (window.VANTA && vantaRef.current && !vantaEffect.current) {
@@ -274,43 +271,6 @@ function Hero() {
     fetchTodayFood();
   }, []);
 
-  useEffect(() => {
-    const apiKey = process.env.REACT_APP_NASA_API_KEY || 'DEMO_KEY';
-
-    const fetchApod = async () => {
-      try {
-        const response = await fetch(`https://api.nasa.gov/planetary/apod?api_key=${apiKey}`);
-
-        if (!response.ok) {
-          setApodTitle('Unavailable');
-          setApodImageUrl('');
-          return;
-        }
-
-        const data = await response.json();
-        const title = typeof data?.title === 'string' ? data.title : 'Astronomy Picture of the Day';
-        const mediaType = data?.media_type;
-        const imageUrl = data?.url;
-        const pageUrl = data?.hdurl || data?.url || 'https://apod.nasa.gov/apod/';
-
-        setApodPageUrl(pageUrl);
-
-        if (mediaType === 'image' && typeof imageUrl === 'string') {
-          setApodTitle(title);
-          setApodImageUrl(imageUrl);
-        } else {
-          setApodTitle(`${title} (video today)`);
-          setApodImageUrl('');
-        }
-      } catch {
-        setApodTitle('Unavailable');
-        setApodImageUrl('');
-      }
-    };
-
-    fetchApod();
-  }, []);
-
   const scrollToBottom = () => {
     if (scrollAnimationFrame.current !== null) {
       cancelAnimationFrame(scrollAnimationFrame.current);
@@ -419,27 +379,6 @@ function Hero() {
           </div>
         </div>
 
-        <div className="purple-divider"></div>
-
-        <div className="apod-column" aria-live="polite">
-          <div className="rapid-rating rapid-rating-apod">
-            <i className="fas fa-star rapid-rating-icon" aria-hidden="true"></i>
-            <p className="rapid-rating-title">Astronomy Picture</p>
-            {apodImageUrl ? (
-              <a href={apodPageUrl} target="_blank" rel="noopener noreferrer" className="apod-link">
-                <img src={apodImageUrl} alt={apodTitle} className="apod-image" loading="lazy" />
-                <span className="apod-full-preview" aria-hidden="true">
-                  <img src={apodImageUrl} alt="" className="apod-full-image" loading="lazy" />
-                </span>
-              </a>
-            ) : (
-              <a href={apodPageUrl} target="_blank" rel="noopener noreferrer" className="rapid-rating-value">
-                Open APOD
-              </a>
-            )}
-            <p className="apod-title">{apodTitle}</p>
-          </div>
-        </div>
       </div>
     </section>
   );

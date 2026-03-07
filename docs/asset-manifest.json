@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/boots.github.io/static/css/main.9a11d4c8.css",
-    "main.js": "/boots.github.io/static/js/main.8d836306.js",
+    "main.css": "/boots.github.io/static/css/main.cd535277.css",
+    "main.js": "/boots.github.io/static/js/main.d26012c4.js",
     "static/js/453.89470ba3.chunk.js": "/boots.github.io/static/js/453.89470ba3.chunk.js",
     "index.html": "/boots.github.io/index.html",
-    "main.9a11d4c8.css.map": "/boots.github.io/static/css/main.9a11d4c8.css.map",
-    "main.8d836306.js.map": "/boots.github.io/static/js/main.8d836306.js.map",
+    "main.cd535277.css.map": "/boots.github.io/static/css/main.cd535277.css.map",
+    "main.d26012c4.js.map": "/boots.github.io/static/js/main.d26012c4.js.map",
     "453.89470ba3.chunk.js.map": "/boots.github.io/static/js/453.89470ba3.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.9a11d4c8.css",
-    "static/js/main.8d836306.js"
+    "static/css/main.cd535277.css",
+    "static/js/main.d26012c4.js"
   ]
 }

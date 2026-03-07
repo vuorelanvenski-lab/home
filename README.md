@@ -14,6 +14,22 @@ Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 The page will reload if you make edits.\
 You will also see any lint errors in the console.
 
+## Environment Variables
+
+Create a `.env.local` file in the project root for API keys used by the app:
+
+```bash
+REACT_APP_NASA_API_KEY=your_nasa_api_key
+REACT_APP_LASTFM_API_KEY=your_lastfm_api_key
+REACT_APP_LASTFM_USERNAME=your_lastfm_username
+REACT_APP_YOUTUBE_API_KEY=your_youtube_api_key
+REACT_APP_YOUTUBE_CHANNEL_ID=your_youtube_channel_id
+```
+
+Notes:
+- `REACT_APP_NASA_API_KEY` is recommended for APOD images. Without it, the app falls back to `DEMO_KEY`, which can be rate-limited.
+- After changing `.env.local`, restart `npm start`.
+
 ### `npm test`
 
 Launches the test runner in the interactive watch mode.\

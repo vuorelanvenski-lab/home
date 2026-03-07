@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
+import FunStuff from './components/FunStuff';
 import Login from './components/Login';
 import './App.css';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentPage, setCurrentPage] = useState<'home' | 'fun'>('home');
 
   // Check localStorage on mount
   useEffect(() => {
@@ -54,14 +56,15 @@ function App() {
     setIsLoggedIn(false);
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('currentUser');
+    setCurrentPage('home');
   };
 
   return (
     <div className="App">
       {isLoggedIn ? (
         <>
-          <Header onLogout={handleLogout} />
-          <Hero />
+          <Header onLogout={handleLogout} onNavigate={setCurrentPage} currentPage={currentPage} />
+          {currentPage === 'home' ? <Hero /> : <FunStuff />}
         </>
       ) : (
         <Login onLogin={handleLogin} onSignup={handleSignup} />
