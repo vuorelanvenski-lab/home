@@ -7,19 +7,19 @@ declare global {
 }
 
 function Hero() {
-  const vantaRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
   const vantaEffect = useRef<any>(null);
-  const scrollAnimationFrame = useRef<number | null>(null);
-  const [dateTime, setDateTime] = useState<string>('');
+  const [weekday, setWeekday] = useState<string>('');
+  const [time, setTime] = useState<string>('');
   const [nowPlaying, setNowPlaying] = useState<string>('Not playing');
   const [weather, setWeather] = useState<string>('Loading...');
   const [countdown, setCountdown] = useState<string>('Loading...');
   const [todayFood, setTodayFood] = useState<string>('Loading...');
 
   useEffect(() => {
-    if (window.VANTA && vantaRef.current && !vantaEffect.current) {
+    if (window.VANTA && heroRef.current && !vantaEffect.current) {
       vantaEffect.current = window.VANTA.NET({
-        el: vantaRef.current,
+        el: heroRef.current,
         mouseControls: true,
         touchControls: true,
         gyroControls: false,
@@ -40,27 +40,23 @@ function Hero() {
         vantaEffect.current.destroy();
         vantaEffect.current = null;
       }
-
-      if (scrollAnimationFrame.current !== null) {
-        cancelAnimationFrame(scrollAnimationFrame.current);
-        scrollAnimationFrame.current = null;
-      }
     };
   }, []);
 
   useEffect(() => {
     const updateDateTime = () => {
       const now = new Date();
-      const weekday = now.toLocaleDateString('en-US', {
+      const weekdayStr = now.toLocaleDateString('en-US', {
         weekday: 'long'
       });
-      const time = now.toLocaleTimeString('en-GB', {
+      const timeStr = now.toLocaleTimeString('en-GB', {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
         hour12: false
       });
-      setDateTime(`${weekday}\n${time}`);
+      setWeekday(weekdayStr);
+      setTime(timeStr);
     };
 
     updateDateTime();
@@ -274,87 +270,24 @@ function Hero() {
     return () => clearInterval(foodInterval);
   }, []);
 
-  const scrollToBottom = () => {
-    if (scrollAnimationFrame.current !== null) {
-      cancelAnimationFrame(scrollAnimationFrame.current);
-      scrollAnimationFrame.current = null;
-    }
-
-    const startY = window.scrollY;
-    const documentHeight = document.documentElement.scrollHeight;
-    const viewportHeight = window.innerHeight;
-    const targetY = Math.max(0, documentHeight - viewportHeight);
-    const distance = targetY - startY;
-
-    if (distance <= 0) {
-      return;
-    }
-
-    const durationMs = 600;
-    const startTime = performance.now();
-
-    const easeInOutCubic = (t: number) =>
-      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
-    const animate = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / durationMs, 1);
-      const eased = easeInOutCubic(progress);
-
-      window.scrollTo(0, startY + distance * eased);
-
-      if (progress < 1) {
-        scrollAnimationFrame.current = requestAnimationFrame(animate);
-      } else {
-        scrollAnimationFrame.current = null;
-      }
-    };
-
-    scrollAnimationFrame.current = requestAnimationFrame(animate);
-  };
-
   return (
-    <section className="hero">
-      <div className="hero-top" ref={vantaRef}>
-        <h1 style={{ whiteSpace: 'pre-line' }}>{dateTime}</h1>
-
-        <div className="purple-divider"></div>
-
-        <div className="icon-links">
-          <a href="https://steamcommunity.com/profiles/76561198971745350" target="_blank" rel="noopener noreferrer" className="icon-link">
-            <i className="fab fa-steam icon"></i>
-            Steam
-          </a>
-          <a href="https://x.com/" target="_blank" rel="noopener noreferrer" className="icon-link">
-            <i className="fab fa-twitter icon"></i>
-            X
-          </a>
-          <a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" className="icon-link">
-            <i className="fab fa-youtube icon"></i>
-            YouTube
-          </a>
-          <a href="https://www.chess.com/member/imaginelos1ng" target="_blank" rel="noopener noreferrer" className="icon-link">
-            <i className="fas fa-chess icon"></i>
-            Chess
-          </a>
-        </div>
-
-        <button
-          type="button"
-          className="scroll-to-bottom"
-          onClick={scrollToBottom}
-          aria-label="Scroll to bottom"
-        >
-          <i className="fas fa-angle-double-down" aria-hidden="true"></i>
-        </button>
-      </div>
-
+    <section className="hero" ref={heroRef}>
       <div className="rapid-section" aria-live="polite">
-        <div className="menu-column">
-          <div className="rapid-rating rapid-rating-menu">
-            <i className="fas fa-utensils rapid-rating-icon" aria-hidden="true"></i>
-            <p className="rapid-rating-title">Today's Food</p>
-            <p className="rapid-rating-menu-text">{todayFood}</p>
+        <div className="food-time-container">
+          <div className="weekday-display">
+            {weekday}
+          </div>
+
+          <div className="menu-column">
+            <div className="rapid-rating rapid-rating-menu">
+              <i className="fas fa-utensils rapid-rating-icon" aria-hidden="true"></i>
+              <p className="rapid-rating-title">Today's Food</p>
+              <p className="rapid-rating-menu-text">{todayFood}</p>
+            </div>
+          </div>
+
+          <div className="time-display">
+            {time}
           </div>
         </div>
 

@@ -1,74 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import FunStuff from './components/FunStuff';
-import Login from './components/Login';
 import './App.css';
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentPage, setCurrentPage] = useState<'home' | 'fun'>('home');
-
-  // Check localStorage on mount
-  useEffect(() => {
-    const storedLogin = localStorage.getItem('isLoggedIn');
-    if (storedLogin === 'true') {
-      setIsLoggedIn(true);
-    }
-    
-    // Initialize users if not already done
-    const existingUsers = localStorage.getItem('users');
-    if (!existingUsers) {
-      const defaultUsers = [{ username: 'admin', password: 'admin' }];
-      localStorage.setItem('users', JSON.stringify(defaultUsers));
-    }
-  }, []);
-
-  const handleLogin = (username: string, password: string): string | null => {
-    const usersJson = localStorage.getItem('users');
-    const users = usersJson ? JSON.parse(usersJson) : [];
-    
-    const user = users.find((u: any) => u.username === username && u.password === password);
-    if (user) {
-      setIsLoggedIn(true);
-      localStorage.setItem('isLoggedIn', 'true');
-      localStorage.setItem('currentUser', username);
-      return null;
-    } else {
-      return 'Invalid credentials';
-    }
-  };
-
-  const handleSignup = (username: string, password: string): { success: boolean; message: string } => {
-    const usersJson = localStorage.getItem('users');
-    const users = usersJson ? JSON.parse(usersJson) : [];
-    
-    if (users.some((u: any) => u.username === username)) {
-      return { success: false, message: 'Username already exists' };
-    }
-    
-    users.push({ username, password });
-    localStorage.setItem('users', JSON.stringify(users));
-    return { success: true, message: 'Account created successfully. You can now log in.' };
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    localStorage.removeItem('isLoggedIn');
-    localStorage.removeItem('currentUser');
-    setCurrentPage('home');
-  };
 
   return (
     <div className="App">
-      {isLoggedIn ? (
-        <>
-          <Header onLogout={handleLogout} onNavigate={setCurrentPage} currentPage={currentPage} />
-          {currentPage === 'home' ? <Hero /> : <FunStuff />}
-        </>
-      ) : (
-        <Login onLogin={handleLogin} onSignup={handleSignup} />
-      )}
+      <Header onNavigate={setCurrentPage} currentPage={currentPage} />
+      {currentPage === 'home' ? <Hero /> : <FunStuff />}
     </div>
   );
 }

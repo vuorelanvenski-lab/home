@@ -1,12 +1,11 @@
 import React from 'react';
 
 interface HeaderProps {
-  onLogout: () => void;
   onNavigate: (page: 'home' | 'fun') => void;
   currentPage: 'home' | 'fun';
 }
 
-function Header({ onLogout, onNavigate, currentPage }: HeaderProps) {
+function Header({ onNavigate, currentPage }: HeaderProps) {
   return (
     <header className="header">
       <div className="header-nav-group">
@@ -23,7 +22,6 @@ function Header({ onLogout, onNavigate, currentPage }: HeaderProps) {
           Fun Stuff
         </button>
       </div>
-      <button onClick={onLogout} className="logout-btn">Logout</button>
     </header>
   );
 }

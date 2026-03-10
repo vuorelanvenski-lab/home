@@ -315,6 +315,21 @@ function FunStuff() {
     return history.slice(-30);
   };
 
+  const calculateRangeChangePct = (history: number[]): number | null => {
+    if (!Array.isArray(history) || history.length < 2) {
+      return null;
+    }
+
+    const startValue = history[0];
+    const endValue = history[history.length - 1];
+
+    if (!Number.isFinite(startValue) || !Number.isFinite(endValue) || startValue === 0) {
+      return null;
+    }
+
+    return ((endValue - startValue) / startValue) * 100;
+  };
+
   const savePinned = (key: 'favoriteCrypto' | 'favoriteStocks', values: string[]) => {
     localStorage.setItem(key, JSON.stringify(values));
   };
@@ -794,9 +809,10 @@ function FunStuff() {
             <div className="market-list">
               {visibleCrypto.map((symbol) => {
                 const quote = cryptoPrices[symbol];
-                const change = quote?.changePct;
-                const directionClass = typeof change === 'number' ? (change >= 0 ? 'up' : 'down') : 'neutral';
                 const filteredHistory = sliceHistoryByRange(quote?.history || [], cryptoRange, 'crypto');
+                const rangeChange = calculateRangeChangePct(filteredHistory);
+                const displayChange = rangeChange !== null ? rangeChange : quote?.changePct;
+                const directionClass = typeof displayChange === 'number' ? (displayChange >= 0 ? 'up' : 'down') : 'neutral';
                 const points = buildSparklinePoints(filteredHistory);
                 const iconSrc = cryptoIcons[symbol];
                 const isPinned = favoriteCrypto.includes(symbol);
@@ -842,7 +858,7 @@ function FunStuff() {
                           <span className="skeleton-line change"></span>
                         ) : (
                           <span className={`market-change ${directionClass}`}>
-                            {typeof change === 'number' ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}%` : 'N/A'}
+                            {typeof displayChange === 'number' ? `${displayChange >= 0 ? '+' : ''}${displayChange.toFixed(2)}%` : 'N/A'}
                           </span>
                         )}
                       </div>
@@ -889,9 +905,10 @@ function FunStuff() {
             <div className="market-list">
               {visibleStocks.map((stock) => {
                 const quote = stockPrices[stock.key];
-                const change = quote?.changePct;
-                const directionClass = typeof change === 'number' ? (change >= 0 ? 'up' : 'down') : 'neutral';
                 const filteredHistory = sliceHistoryByRange(quote?.history || [], stockRange, 'stock');
+                const rangeChange = calculateRangeChangePct(filteredHistory);
+                const displayChange = rangeChange !== null ? rangeChange : quote?.changePct;
+                const directionClass = typeof displayChange === 'number' ? (displayChange >= 0 ? 'up' : 'down') : 'neutral';
                 const points = buildSparklinePoints(filteredHistory);
                 const isPinned = favoriteStocks.includes(stock.key);
                 const isLoading = quote?.price === 'Loading...';
@@ -933,7 +950,7 @@ function FunStuff() {
                           <span className="skeleton-line change"></span>
                         ) : (
                           <span className={`market-change ${directionClass}`}>
-                            {typeof change === 'number' ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}%` : 'N/A'}
+                            {typeof displayChange === 'number' ? `${displayChange >= 0 ? '+' : ''}${displayChange.toFixed(2)}%` : 'N/A'}
                           </span>
                         )}
                       </div>
