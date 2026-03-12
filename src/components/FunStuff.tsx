@@ -10,6 +10,10 @@ type MarketQuote = {
 type DataStatus = 'loading' | 'live' | 'fallback' | 'rate-limited' | 'error';
 type RangeOption = '1D' | '7D' | '30D';
 
+const TIMEOUT_MS = 8000;
+const MAX_RETRIES = 2;
+const proxyOptions = ['https://corsproxy.io/?', 'https://api.allorigins.win/raw?url='];
+
 const CRYPTO_SYMBOLS = [
   'BTC',
   'ETH',
@@ -229,6 +233,48 @@ function FunStuff() {
     SHOP: 'https://www.tradingview.com/symbols/NYSE-SHOP/'
   };
 
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const fetchWithTimeout = async (url: string, timeoutMs: number = TIMEOUT_MS, init?: RequestInit): Promise<Response> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  const fetchWithFallback = async (
+    url: string,
+    options?: { useProxy?: boolean; retries?: number; timeoutMs?: number; init?: RequestInit }
+  ): Promise<Response> => {
+    const { useProxy = false, retries = MAX_RETRIES, timeoutMs = TIMEOUT_MS, init } = options || {};
+    const targets = useProxy ? [url, ...proxyOptions.map((proxy) => `${proxy}${encodeURIComponent(url)}`)] : [url];
+    let lastError: unknown = null;
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      for (const target of targets) {
+        try {
+          const response = await fetchWithTimeout(target, timeoutMs, init);
+          if (response.ok) {
+            return response;
+          }
+          lastError = `${response.status} ${response.statusText}`;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      if (attempt < retries) {
+        await wait(400 * (attempt + 1));
+      }
+    }
+
+    throw new Error(`Failed to fetch ${url}: ${String(lastError)}`);
+  };
+
   const usdFormatter = useMemo(
     () =>
       new Intl.NumberFormat('en-US', {
@@ -385,23 +431,8 @@ function FunStuff() {
   };
 
   const fetchTextWithCorsFallback = async (url: string) => {
-    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-
-    try {
-      const direct = await fetch(url);
-      if (direct.ok) {
-        return await direct.text();
-      }
-    } catch {
-      // Fall through to proxy attempt.
-    }
-
-    const proxied = await fetch(proxyUrl);
-    if (!proxied.ok) {
-      throw new Error('Text fetch failed');
-    }
-
-    return await proxied.text();
+    const response = await fetchWithFallback(url, { useProxy: true });
+    return await response.text();
   };
 
   const fetchWithFallback = async (url: string) => {
@@ -458,7 +489,7 @@ function FunStuff() {
     };
 
     try {
-      const response = await fetch(`https://api.nasa.gov/planetary/apod?api_key=${nasaApiKey}&thumbs=true`);
+      const response = await fetchWithFallback(`https://api.nasa.gov/planetary/apod?api_key=${nasaApiKey}&thumbs=true`);
 
       if (!response.ok) {
         if (!usingDemoKey && (response.status === 400 || response.status === 403)) {
@@ -531,7 +562,7 @@ function FunStuff() {
       const day = getDayOfYear();
       const pokemonId = (day % maxPokemonId) + 1;
 
-      const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
+      const response = await fetchWithFallback(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
       if (!response.ok) {
         setPokemonName('Unavailable');
         setPokemonImage('');
@@ -565,7 +596,7 @@ function FunStuff() {
 
     try {
       const cryptoIds = CRYPTO_SYMBOLS.map((symbol) => cryptoIdBySymbol[symbol]).join(',');
-      const response = await fetch(
+      const response = await fetchWithFallback(
         `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${cryptoIds}&price_change_percentage=24h&sparkline=true`
       );
 
@@ -657,8 +688,8 @@ function FunStuff() {
 
           try {
             const [latestResponse, historyResponse] = await Promise.all([
-              fetchWithFallback(latestUrl),
-              fetchWithFallback(historyUrl)
+              fetchWithFallback(latestUrl, { useProxy: true }),
+              fetchWithFallback(historyUrl, { useProxy: true })
             ]);
 
             if (!latestResponse.ok) {

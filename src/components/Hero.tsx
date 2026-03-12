@@ -174,20 +174,58 @@ function Hero() {
   useEffect(() => {
     const restaurantId = 'c9266fa6-dd31-4800-92b2-1a41b6267613';
     const base = 'https://menu.leijonacatering.fi/AromieMenus/FI/Default/Leijona/HoikanhoviKajaani';
-    const proxyPrefix = 'https://corsproxy.io/?';
+    const proxyOptions = [
+      'https://corsproxy.io/?',
+      'https://api.allorigins.win/raw?url='
+    ];
     const today = new Date().toISOString().slice(0, 10);
+    const TIMEOUT_MS = 8000;
+    const MAX_RETRIES = 2;
 
-    const fetchWithFallback = async (url: string) => {
+    const fetchWithTimeout = async (url: string, timeoutMs: number = TIMEOUT_MS): Promise<Response> => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
       try {
-        const direct = await fetch(url);
+        return await fetch(url, { signal: controller.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
+
+    const fetchWithFallback = async (url: string, retryCount = 0): Promise<Response> => {
+      // Try direct fetch first
+      try {
+        const direct = await fetchWithTimeout(url);
         if (direct.ok) {
           return direct;
         }
-      } catch {
-        // Fallback to proxy if direct call fails (usually CORS).
+      } catch (err) {
+        // Direct fetch failed, proceed to proxies
       }
 
-      return fetch(`${proxyPrefix}${encodeURIComponent(url)}`);
+      // Try each proxy in sequence
+      for (const proxy of proxyOptions) {
+        try {
+          const proxied = await fetchWithTimeout(`${proxy}${encodeURIComponent(url)}`);
+          if (proxied.ok) {
+            return proxied;
+          }
+        } catch {
+          // Continue to next proxy
+          continue;
+        }
+      }
+
+      // If all attempts failed and we have retries left, wait and retry
+      if (retryCount < MAX_RETRIES) {
+        const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 5000);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+        return fetchWithFallback(url, retryCount + 1);
+      }
+
+      // Create a failed response
+      throw new Error(`Failed to fetch after ${MAX_RETRIES} retries and ${proxyOptions.length} proxies`);
     };
 
     const decodeHtml = (value: string) => {
@@ -199,36 +237,70 @@ function Hero() {
     const fetchTodayFood = async () => {
       try {
         const dinerGroupsUrl = `${base}/api/GetRestaurantPublicDinerGroups?id=${restaurantId}&startDate=${today}&endDate=${today}`;
-        const dinerGroupResponse = await fetchWithFallback(dinerGroupsUrl);
-
-        if (!dinerGroupResponse.ok) {
-          setTodayFood('Unavailable');
+        
+        let dinerGroupResponse;
+        try {
+          dinerGroupResponse = await fetchWithFallback(dinerGroupsUrl);
+        } catch (err) {
+          setTodayFood('Menu service unavailable');
           return;
         }
 
-        const dinerGroups = await dinerGroupResponse.json();
+        if (!dinerGroupResponse.ok) {
+          setTodayFood('Menu service error');
+          return;
+        }
+
+        let dinerGroups;
+        try {
+          dinerGroups = await dinerGroupResponse.json();
+        } catch {
+          setTodayFood('Invalid menu format');
+          return;
+        }
+
         const feedId = Array.isArray(dinerGroups) && dinerGroups.length > 0 ? dinerGroups[0]?.Id : null;
 
         if (!feedId) {
-          setTodayFood('No menu found');
+          setTodayFood('No menu for today');
           return;
         }
 
         const rssUrl = `${base}/api/Common/Restaurant/GetRssFeed/${feedId}/0`;
-        const rssResponse = await fetchWithFallback(rssUrl);
-
-        if (!rssResponse.ok) {
-          setTodayFood('Unavailable');
+        let rssResponse;
+        try {
+          rssResponse = await fetchWithFallback(rssUrl);
+        } catch (err) {
+          setTodayFood('Feed unavailable');
           return;
         }
 
-        const xmlText = await rssResponse.text();
+        if (!rssResponse.ok) {
+          setTodayFood('Feed error');
+          return;
+        }
+
+        let xmlText;
+        try {
+          xmlText = await rssResponse.text();
+        } catch {
+          setTodayFood('Feed read error');
+          return;
+        }
+
         const xmlDoc = new DOMParser().parseFromString(xmlText, 'text/xml');
+        
+        // Check for XML parse errors
+        if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
+          setTodayFood('Invalid feed format');
+          return;
+        }
+
         const descriptionNode = xmlDoc.querySelector('channel > item > description');
         const descriptionRaw = descriptionNode?.textContent?.trim() || '';
 
         if (!descriptionRaw) {
-          setTodayFood('No menu found');
+          setTodayFood('No menu items found');
           return;
         }
 
@@ -258,9 +330,9 @@ function Hero() {
           }
         });
         
-        setTodayFood(formatted.trim() || 'No menu found');
-      } catch {
-        setTodayFood('Unavailable');
+        setTodayFood(formatted.trim() || 'No menu items found');
+      } catch (err) {
+        setTodayFood('Menu load failed');
       }
     };
 
