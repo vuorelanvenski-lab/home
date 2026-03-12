@@ -435,19 +435,6 @@ function FunStuff() {
     return await response.text();
   };
 
-  const fetchWithFallback = async (url: string) => {
-    try {
-      const direct = await fetch(url);
-      if (direct.ok) {
-        return direct;
-      }
-    } catch {
-      // Fall through to proxy.
-    }
-
-    return fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-  };
-
   const fetchApod = async () => {
     setApodStatus('loading');
 
